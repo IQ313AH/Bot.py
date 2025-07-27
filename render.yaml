@@ -1,0 +1,9 @@
+services:
+  - type: worker
+    name: telegram-bot
+    runtime: python
+    repo: https://github.com/IQ313AH/Bot.py
+    branch: main
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: python main.py
