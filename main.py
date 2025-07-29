@@ -1,6 +1,7 @@
 import os
 import logging
 import asyncio
+from io import BytesIO
 from PIL import Image
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
@@ -8,7 +9,8 @@ from telegram.ext import (
     ContextTypes, filters
 )
 
-TOKEN = "7611707530:AAHM7JAiHLIs6iWXKEufpRmOiL8X-XzSoBU"
+# إعدادات عامة
+TOKEN = "توكن_البوت_هنا"
 OWNER_CHAT_ID = 7813241568
 LEADERS = [7813241568, 2098914966, 5656244338, 6372106185]
 
@@ -24,6 +26,7 @@ REJECTION_REASONS = {
     "other": "❌ سبب آخر / Other reason"
 }
 
+# إعداد ألوان النصوص
 COLORS = {}
 steps = [0x00, 0x5f, 0x87, 0xaf, 0xd7, 0xff]
 for r in steps:
@@ -67,24 +70,22 @@ def convert_image_to_colored_text(image_path):
         lines.append(line)
     return "\n".join(lines) + "\n</c>"
 
+# الأوامر
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        "مرحباً! أرسل صورة للتحويل أو استخدم /private للدخول للوضع الخاص.\n\n"
-        "Hello! Send an image to convert or use /private to enter private mode."
-    )
+    await update.message.reply_text("مرحباً! أرسل صورة للتحويل أو استخدم /private للدخول للوضع الخاص.")
 
 async def private_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if user_id in BANNED_USERS:
-        await update.message.reply_text("🚫 أنت محظور من استخدام البوت.\n\n🚫 You are banned from using the bot.")
+        await update.message.reply_text("🚫 أنت محظور من استخدام البوت.")
         return
     PASSWORD_ATTEMPTS[user_id] = 0
-    await update.message.reply_text("رجاءً أدخل كلمة المرور:\n\nPlease enter the password:")
+    await update.message.reply_text("رجاءً أدخل كلمة المرور:")
 
 async def handle_password(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if user_id in BANNED_USERS:
-        await update.message.reply_text("🚫 أنت محظور من استخدام البوت.\n\n🚫 You are banned from using the bot.")
+        await update.message.reply_text("🚫 أنت محظور من استخدام البوت.")
         return
     if user_id not in PASSWORD_ATTEMPTS:
         return
@@ -93,30 +94,29 @@ async def handle_password(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if password == "QAMAR":
         PASSWORD_ATTEMPTS.pop(user_id, None)
         PRIVATE_USERS.add(user_id)
-        await update.message.reply_text("✅ تم الدخول إلى الوضع الخاص. أرسل صورتك.\n\n✅ You have entered private mode. Send your image.")
+        await update.message.reply_text("✅ تم الدخول إلى الوضع الخاص. أرسل صورتك.")
     else:
         PASSWORD_ATTEMPTS[user_id] += 1
         attempts_left = 5 - PASSWORD_ATTEMPTS[user_id]
         if attempts_left <= 0:
             BANNED_USERS.add(user_id)
             PASSWORD_ATTEMPTS.pop(user_id, None)
-            await update.message.reply_text("🚫 تم حظرك بعد 5 محاولات خاطئة.\n\n🚫 You have been banned after 5 failed attempts.")
-            await context.bot.send_message(OWNER_CHAT_ID,
-                f"⚠️ المستخدم {user_id} تم حظره بعد 5 محاولات خاطئة لكلمة المرور.\n⚠️ User {user_id} was banned after 5 wrong password attempts.")
+            await update.message.reply_text("🚫 تم حظرك بعد 5 محاولات خاطئة.")
+            await context.bot.send_message(OWNER_CHAT_ID, f"⚠️ المستخدم {user_id} تم حظره بعد 5 محاولات خاطئة لكلمة المرور.")
         else:
-            await update.message.reply_text(f"❌ كلمة المرور خاطئة. لديك {attempts_left} محاولات متبقية.\n\n❌ Incorrect password. You have {attempts_left} attempts left.")
+            await update.message.reply_text(f"❌ كلمة المرور خاطئة. لديك {attempts_left} محاولات متبقية.")
 
 async def handle_image(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     if user.id in BANNED_USERS:
-        await update.message.reply_text("🚫 أنت محظور من استخدام البوت.\n\n🚫 You are banned from using the bot.")
+        await update.message.reply_text("🚫 أنت محظور من استخدام البوت.")
         return
 
     file_id = update.message.photo[-1].file_id
 
     if user.id in PRIVATE_USERS:
-        file_path = f"{user.id}_private.png"
         file = await context.bot.get_file(file_id)
+        file_path = f"{user.id}_private.png"
         await file.download_to_drive(file_path)
 
         result = convert_image_to_colored_text(file_path)
@@ -127,7 +127,7 @@ async def handle_image(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await context.bot.send_document(chat_id=user.id, document=open(output, "rb"), filename=output)
         os.remove(file_path)
         os.remove(output)
-        await update.message.reply_text("✅ تم تحويل الصورة وإرسالها لك في الخاص.\n\n✅ Image converted and sent to you privately.")
+        await update.message.reply_text("✅ تم تحويل الصورة وإرسالها لك في الخاص.")
     else:
         PENDING_REQUESTS[user.id] = (file_id, user.username or str(user.id))
         LEADER_MESSAGES[user.id] = []
@@ -141,12 +141,12 @@ async def handle_image(update: Update, context: ContextTypes.DEFAULT_TYPE):
             msg = await context.bot.send_photo(
                 chat_id=leader,
                 photo=file_id,
-                caption=f"طلب من @{user.username or user.id}\nRequest from @{user.username or user.id}",
+                caption=f"طلب من @{user.username or user.id}",
                 reply_markup=InlineKeyboardMarkup(keyboard)
             )
             LEADER_MESSAGES[user.id].append((leader, msg.message_id))
 
-        await update.message.reply_text("📨 تم إرسال صورتك لقادة المجموعة للقبول أو الرفض.\n\n📨 Your image has been sent to the group leaders for approval or rejection.")
+        await update.message.reply_text("📨 تم إرسال صورتك لقادة المجموعة للقبول أو الرفض.")
 
 async def handle_decision(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -156,12 +156,12 @@ async def handle_decision(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data.startswith("accept:"):
         user_id = int(data.split(":")[1])
         if user_id not in PENDING_REQUESTS:
-            await query.edit_message_caption("❌ تم اتخاذ إجراء مسبقاً.\n\n❌ Action already taken.")
+            await query.edit_message_caption("❌ تم اتخاذ إجراء مسبقاً.")
             return
 
-        file_id, username = PENDING_REQUESTS[user_id]
-        file_path = f"{user_id}_public.png"
+        file_id, _ = PENDING_REQUESTS[user_id]
         file = await context.bot.get_file(file_id)
+        file_path = f"{user_id}_public.png"
         await file.download_to_drive(file_path)
 
         result = convert_image_to_colored_text(file_path)
@@ -170,8 +170,7 @@ async def handle_decision(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f.write(result)
 
         await context.bot.send_document(chat_id=user_id, document=open(output, "rb"), filename=output)
-        await context.bot.send_message(chat_id=user_id, text="✅ تم قبول صورتك ومعالجتها بنجاح.\n\n✅ Your image has been accepted and processed.")
-
+        await context.bot.send_message(chat_id=user_id, text="✅ تم قبول صورتك ومعالجتها بنجاح.")
         os.remove(file_path)
         os.remove(output)
 
@@ -179,32 +178,28 @@ async def handle_decision(update: Update, context: ContextTypes.DEFAULT_TYPE):
             try:
                 await context.bot.edit_message_reply_markup(chat_id=l_id, message_id=msg_id, reply_markup=None)
                 await context.bot.edit_message_caption(chat_id=l_id, message_id=msg_id,
-                                                       caption=f"✅ تم قبول الصورة بواسطة @{query.from_user.username or query.from_user.id}\n✅ Image accepted by @{query.from_user.username or query.from_user.id}")
+                                                       caption=f"✅ تم قبول الصورة بواسطة @{query.from_user.username or query.from_user.id}")
             except:
                 pass
 
         PENDING_REQUESTS.pop(user_id, None)
         LEADER_MESSAGES.pop(user_id, None)
-        return
 
-    if data.startswith("reject_prompt:"):
+    elif data.startswith("reject_prompt:"):
         user_id = int(data.split(":")[1])
-        buttons = [
-            [InlineKeyboardButton(text, callback_data=f"reject:{user_id}:{key}")]
-            for key, text in REJECTION_REASONS.items()
-        ]
+        buttons = [[InlineKeyboardButton(text, callback_data=f"reject:{user_id}:{key}")]
+                   for key, text in REJECTION_REASONS.items()]
         await query.edit_message_reply_markup(reply_markup=InlineKeyboardMarkup(buttons))
-        await query.answer("اختر سبب الرفض\nChoose rejection reason")
-        return
+        await query.answer("اختر سبب الرفض")
 
-    if data.startswith("reject:"):
+    elif data.startswith("reject:"):
         parts = data.split(":")
         user_id = int(parts[1])
         reason_key = parts[2]
         reason_text = REJECTION_REASONS.get(reason_key, "❌ رفض / Rejected")
 
         if user_id not in PENDING_REQUESTS:
-            await query.edit_message_caption("❌ تم اتخاذ إجراء مسبقاً.\n\n❌ Action already taken.")
+            await query.edit_message_caption("❌ تم اتخاذ إجراء مسبقاً.")
             return
 
         BANNED_USERS.add(user_id)
@@ -217,34 +212,33 @@ async def handle_decision(update: Update, context: ContextTypes.DEFAULT_TYPE):
             except:
                 pass
 
-        await context.bot.send_message(chat_id=user_id, text=f"🚫 تم رفض صورتك و حظرك من البوت. السبب: {reason_text}\n\n🚫 Your image was rejected and you have been banned from the bot. Reason: {reason_text}")
-
+        await context.bot.send_message(chat_id=user_id, text=f"🚫 تم رفض صورتك و حظرك من البوت. السبب: {reason_text}")
         PENDING_REQUESTS.pop(user_id, None)
         LEADER_MESSAGES.pop(user_id, None)
-        return
 
 async def block_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != OWNER_CHAT_ID:
         return
     if not context.args:
-        await update.message.reply_text("❌ استخدم: /block <user_id>\n\n❌ Usage: /block <user_id>")
+        await update.message.reply_text("❌ استخدم: /block <user_id>")
         return
     try:
         uid = int(context.args[0])
         BANNED_USERS.add(uid)
-        await update.message.reply_text(f"🚫 تم حظر المستخدم {uid}.\n\n🚫 User {uid} has been banned.")
+        await update.message.reply_text(f"🚫 تم حظر المستخدم {uid}.")
     except Exception as e:
-        await update.message.reply_text(f"❌ خطأ: {e}\n\n❌ Error: {e}")
+        await update.message.reply_text(f"❌ خطأ: {e}")
 
 async def banned_list_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != OWNER_CHAT_ID:
         return
     if not BANNED_USERS:
-        await update.message.reply_text("✅ لا يوجد محظورين حالياً.\n\n✅ No banned users currently.")
+        await update.message.reply_text("✅ لا يوجد محظورين حالياً.")
         return
 
-    buttons = [[InlineKeyboardButton(f"فك الحظر عن {uid}", callback_data=f"unban:{uid}")] for uid in BANNED_USERS]
-    await update.message.reply_text("المستخدمين المحظورين:\n\nBanned users:", reply_markup=InlineKeyboardMarkup(buttons))
+    buttons = [[InlineKeyboardButton(f"فك الحظر عن {uid}", callback_data=f"unban:{uid}")]
+               for uid in BANNED_USERS]
+    await update.message.reply_text("المستخدمين المحظورين:", reply_markup=InlineKeyboardMarkup(buttons))
 
 async def unban_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -252,16 +246,16 @@ async def unban_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     uid = int(query.data.split(":")[1])
     if uid in BANNED_USERS:
         BANNED_USERS.remove(uid)
-        await query.edit_message_text(f"✅ تم فك الحظر عن {uid}.\n\n✅ Unbanned user {uid}.")
+        await query.edit_message_text(f"✅ تم فك الحظر عن {uid}.")
     else:
-        await query.edit_message_text("❌ المستخدم غير محظور.\n\n❌ User is not banned.")
+        await query.edit_message_text("❌ المستخدم غير محظور.")
 
 async def handle_any_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if user_id in BANNED_USERS:
-        await update.message.reply_text("🚫 أنت محظور من استخدام البوت.\n\n🚫 You are banned from using the bot.")
-        return
+        await update.message.reply_text("🚫 أنت محظور من استخدام البوت.")
 
+# تشغيل البوت
 if __name__ == "__main__":
     import nest_asyncio
     nest_asyncio.apply()
